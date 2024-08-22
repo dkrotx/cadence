@@ -245,9 +245,16 @@ getTasksPumpLoop:
 }
 
 func (tr *taskReader) getTaskBatchWithRange(readLevel int64, maxReadLevel int64) ([]*persistence.TaskInfo, error) {
+	var firstError error
+	var attempts int
+
 	var response *persistence.GetTasksResponse
 	op := func() (err error) {
+		attempts++
 		response, err = tr.db.GetTasks(readLevel, maxReadLevel, tr.config.GetTasksBatchSize())
+		if err != nil && firstError == nil {
+			firstError = err
+		}
 		return
 	}
 	err := tr.throttleRetry.Do(context.Background(), op)
@@ -259,6 +266,19 @@ func (tr *taskReader) getTaskBatchWithRange(readLevel int64, maxReadLevel int64)
 			tag.WorkflowTaskListType(tr.taskListID.GetType()))
 		return nil, err
 	}
+
+	tr.logger.Info("performed gettasks",
+		tag.WorkflowDomainID(tr.db.domainID),
+		tag.WorkflowTaskListName(tr.db.taskListName),
+		tag.WorkflowTaskListType(tr.db.taskType),
+		tag.AttemptCount(attempts),
+		tag.ReadLevel(readLevel),
+		tag.MaxLevel(maxReadLevel),
+		tag.ResponseTotalSize(tr.config.GetTasksBatchSize()),
+		tag.ResponseSize(len(response.Tasks)),
+		tag.StoreError(firstError),
+	)
+
 	return response.Tasks, nil
 }
 
