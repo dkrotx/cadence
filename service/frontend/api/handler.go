@@ -429,6 +429,8 @@ func (wh *WorkflowHandler) PollForActivityTask(
 		return nil, validate.ErrDomainNotSet
 	}
 
+	ctx, _ = context.WithTimeout(ctx, common.MinLongPollTimeout+time.Second)
+
 	scope := getMetricsScopeWithDomain(metrics.FrontendPollForActivityTaskScope, pollRequest, wh.GetMetricsClient()).Tagged(metrics.GetContextTags(ctx)...)
 	wh.GetLogger().Debug("Received PollForActivityTask")
 	if err := common.ValidateLongPollContextTimeout(
@@ -542,6 +544,8 @@ func (wh *WorkflowHandler) PollForDecisionTask(
 	if domainName == "" {
 		return nil, validate.ErrDomainNotSet
 	}
+
+	ctx, _ = context.WithTimeout(ctx, common.MinLongPollTimeout+time.Second)
 
 	scope := getMetricsScopeWithDomain(metrics.FrontendPollForDecisionTaskScope, pollRequest, wh.GetMetricsClient()).Tagged(metrics.GetContextTags(ctx)...)
 	wh.GetLogger().Debug("Received PollForDecisionTask")
