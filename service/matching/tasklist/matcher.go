@@ -428,7 +428,17 @@ func (tm *TaskMatcher) Poll(ctx context.Context, isolationGroup string) (*Intern
 		TaskListKind: tm.tasklistKind.Ptr(),
 		EventName:    "Matcher Falling Back to Non-Local Polling",
 	})
-	return tm.pollOrForward(ctx, startT, isolationGroup, isolatedTaskC, tm.taskC, tm.queryTaskC)
+
+	task, err := tm.pollOrForward(ctx, startT, isolationGroup, isolatedTaskC, tm.taskC, tm.queryTaskC)
+
+	if timeSpent := time.Since(startT); timeSpent > 10*time.Second {
+		tm.log.Info(
+			"spent much time on poll",
+			tag.Dynamic("details", fmt.Sprintf("time_spent: %v, has_task=%v, err=%v", timeSpent, task != nil, err)),
+		)
+	}
+
+	return task, err
 }
 
 // PollForQuery blocks until a *query* task is found or context deadline is exceeded
