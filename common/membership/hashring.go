@@ -264,6 +264,16 @@ func (r *ring) refresh() (refreshed bool, err error) {
 	return true, nil
 }
 
+func (r *ring) refreshAndNotifySubscribers(e *ChangedEvent) {
+	refreshed, err := r.refresh()
+	if err != nil {
+		r.logger.Error("refreshing ring", tag.Error(err))
+	}
+	if refreshed {
+		r.notifySubscribers(e)
+	}
+}
+
 func (r *ring) refreshRingWorker() {
 	defer r.shutdownWG.Done()
 
@@ -274,18 +284,10 @@ func (r *ring) refreshRingWorker() {
 		case <-r.shutdownCh:
 			return
 		case event := <-r.refreshChan: // local signal or signal from provider
-			refreshed, err := r.refresh()
-			if err != nil {
-				r.logger.Error("refreshing ring", tag.Error(err))
-			}
-			if refreshed {
-				r.notifySubscribers(event)
-			}
+			r.refreshAndNotifySubscribers(event)
 		case <-refreshTicker.C: // periodically refresh membership
+			r.refreshAndNotifySubscribers(&ChangedEvent{})
 			r.emitHashIdentifier()
-			if _, err := r.refresh(); err != nil {
-				r.logger.Error("periodically refreshing ring", tag.Error(err))
-			}
 		}
 	}
 }
