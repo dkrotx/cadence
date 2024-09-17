@@ -47,8 +47,8 @@ var ErrInsufficientHosts = &types.InternalServiceError{Message: "Not enough host
 var emptyEvent = &ChangedEvent{}
 
 const (
-	minRefreshInternal     = time.Second * 4
-	defaultRefreshInterval = time.Second * 10
+	minRefreshInternal     = time.Second / 4
+	defaultRefreshInterval = time.Second
 	replicaPoints          = 100
 )
 
