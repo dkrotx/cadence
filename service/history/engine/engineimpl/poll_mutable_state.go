@@ -160,6 +160,15 @@ func (e *historyEngineImpl) getMutableStateOrLongPoll(
 		return nil, err
 	}
 
+	if response.GetVersionHistories() == nil {
+		e.logger.Warn("current version history does not exist",
+			tag.Dynamic("requested-version-history", request.VersionHistoryItem),
+		)
+		return nil, &types.CurrentBranchChangedError{
+			Message: "current branch not found - no version histories exist",
+		}
+	}
+
 	currentVersionHistory, err := persistence.NewVersionHistoriesFromInternalType(
 		response.GetVersionHistories(),
 	).GetCurrentVersionHistory()
