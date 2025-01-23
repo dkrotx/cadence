@@ -623,6 +623,8 @@ func (c *clientImpl) ScheduleDecisionTask(
 	request *types.ScheduleDecisionTaskRequest,
 	opts ...yarpc.CallOption,
 ) error {
+	c.logger.Info("scheduling a new decision task.")
+
 	peer, err := c.peerResolver.FromWorkflowID(request.WorkflowExecution.WorkflowID)
 	if err != nil {
 		return err
