@@ -102,6 +102,7 @@ func New(p Params) (Result, error) {
 
 func newClient(p Params) (dynamicconfig.Client, error) {
 	cfg := p.Cfg.DynamicConfig
+
 	switch cfg.Client {
 	case "":
 		if p.Cfg.DynamicConfigClient.Filepath == "" {
@@ -168,13 +169,13 @@ func newFileBasedClient(p Params, cfg dynamicconfig.FileBasedClientConfig) (dyna
 	}
 	cfg.Filepath = constructPathIfNeed(p.RootDir, cfg.Filepath)
 
-	stopped := make(chan struct{})
-	client, err := dynamicconfig.NewFileBasedClient(&cfg, p.Logger, stopped)
+	stopPeriodicUpdate := make(chan struct{})
+	client, err := dynamicconfig.NewFileBasedClient(&cfg, p.Logger, stopPeriodicUpdate)
 	if err != nil {
 		return nil, err
 	}
 	p.Lifecycle.Append(fx.StopHook(func() {
-		close(stopped)
+		close(stopPeriodicUpdate)
 	}))
 	return client, nil
 }
