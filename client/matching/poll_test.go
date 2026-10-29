@@ -117,6 +117,43 @@ func TestPollSendsRequestToPartitionWithoutMutatingIt(t *testing.T) {
 	}
 }
 
+func TestCancelOutstandingPollIsRoutedToInFlightPollPartition(t *testing.T) {
+	c, deps := newTestPollClient(t)
+	cancelRequest := func() *types.CancelOutstandingPollRequest {
+		return &types.CancelOutstandingPollRequest{
+			DomainUUID: _testDomainUUID,
+			PollerID:   "poller-id",
+			TaskList:   &types.TaskList{Name: _testTaskList},
+		}
+	}
+	deps.peerResolver.EXPECT().FromTaskList(_testPartition).Return("peer0", nil).Times(2)
+	deps.peerResolver.EXPECT().FromTaskList(_testTaskList).Return("peer1", nil)
+	deps.provider.EXPECT().UpdatePartitionConfig(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any())
+	deps.loadBalancer.EXPECT().UpdateWeight(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any())
+	deps.rawClient.EXPECT().PollForDecisionTask(gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(ctx context.Context, _ *types.MatchingPollForDecisionTaskRequest, _ ...yarpc.CallOption) (*types.MatchingPollForDecisionTaskResponse, error) {
+			assert.NoError(t, c.CancelOutstandingPoll(ctx, cancelRequest()))
+			return &types.MatchingPollForDecisionTaskResponse{}, nil
+		})
+	partition := &types.TaskList{Name: _testPartition}
+	partitionCancel := cancelRequest()
+	partitionCancel.TaskList = partition
+	gomock.InOrder(
+		deps.rawClient.EXPECT().CancelOutstandingPoll(gomock.Any(), partitionCancel, []yarpc.CallOption{yarpc.WithShardKey("peer0")}),
+		deps.rawClient.EXPECT().CancelOutstandingPoll(gomock.Any(), cancelRequest(), []yarpc.CallOption{yarpc.WithShardKey("peer1")}),
+	)
+
+	_, err := c.PollForDecisionTask(context.Background(), &types.MatchingPollForDecisionTaskRequest{
+		DomainUUID:  _testDomainUUID,
+		PollerID:    "poller-id",
+		PollRequest: &types.PollForDecisionTaskRequest{TaskList: &types.TaskList{Name: _testTaskList}},
+	})
+	assert.NoError(t, err)
+
+	// the poll has returned, so the cancel goes to the task list given by the caller
+	assert.NoError(t, c.CancelOutstandingPoll(context.Background(), cancelRequest()))
+}
+
 type testPollClientDeps struct {
 	rawClient    *MockClient
 	peerResolver *MockPeerResolver
